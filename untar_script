@@ -1,0 +1,12 @@
+#!/bin/bash
+
+head=/archive/Usama.Anber/Hiram
+init_date=(0627 0628 0629 0630)
+for i in ${init_date[@]}
+do
+runname=C384n3-GHS_fore_nh_0313_06${i}-C
+andir=${head}/${runname}/history/
+
+  mkdir -p ${andir}/2006${i}
+  tar -xvf ${andir}/2006${i}.nc.tar -C ${andir}/2006${i}
+done
