@@ -1,4 +1,4 @@
-! create nc file for large scale SCM forcing
+# create nc file for large scale SCM forcing
 
 import numpy as np
 from netCDF4 import Dataset
