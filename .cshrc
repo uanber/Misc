@@ -1,4 +1,4 @@
-# ~/.cshrc for unified home directory
+# ~/.cshrc for unified home directory (USED FOR GFDL HOME DIRECTORY)
 
 source /home/gfdl/init/csh.cshrc
 
