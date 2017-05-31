@@ -28,3 +28,8 @@ def read_storm(text_file):
 d = read_storm("/Users/uma2103/test_f.txt")        
 
 ID=[0001, 0002]
+for i in ID:
+for i in range(1,len(d)+1):
+    k= "%04d" % i
+    
+    d[k]
