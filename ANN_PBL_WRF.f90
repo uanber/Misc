@@ -11,7 +11,7 @@ SUBROUTINE ANN_INPUTS (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl
               
               sl_real, th_phy, rt_real, sl_adv_real, rt_adv_real, w_real, sl_domain_top, &
               rt_domain_top, lh, shf, tsk, SWDNT, swdn_tod, PSFC, &
-              cldmid, cldhigh, qr, qc, &
+              cldmid, cldhigh, qr, qc, qv, &
               ph, phb, & ! geopotential hieght and its perturbation 
               !theta_T
               ims,ime,jms,jme,kms,kme, znu)
@@ -69,8 +69,8 @@ real, intent(in), dimension(34) :: pbl_diag_decoder_b
 
 
 !integer, INTENT(IN) ::  npz
-real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: sl_real, rt_real
-real, intent(in), dimension(ims:ime,kms:kme+1,jms:jme) ::  w_real ! +1 ?
+real, intent(INOUT), dimension(ims:ime,kms:kme,jms:jme) :: sl_real, rt_real, w_real
+real, intent(in), dimension(ims:ime,kms:kme+1,jms:jme) ::  w ! vertical wind
 real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: th_phy ! potential temperature perturbation
 !real, intent(INOUT), dimension(ims:ime,kms:kme,jms:jme) :: theta_T ! potential temperature 
 
@@ -85,21 +85,24 @@ real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qr ! 3D rain water mixin
                                                            !For top of domain just specify some level at 3km
 
 real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qc ! 3D cloud water mixing ratio. 
-                                                           !For top of domain just specify some level at 3km
-
-
+                                                           
+real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qv ! 3D water vapor mixing ratio. 
+                                                           
 
               
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!              
-! calculating liquid water static energy sl_real!              
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
+! calculating liquid water static energy sl_real and rt_real and w_real!             
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 do k=1, km
    do i=ims,ime
       do j=jms,jme
       
           sl_real(i,k,j) = Cpd* th_phy(i,k,j)+300 - Lv * qc(i,k,j) + g * (PHB(i,k,j) + PH(i,k,j))/9.81 ! last term is g*z
-         
+          rt_real(i,k,j) = qv(i,k,j) + qc(i,kj)
+          w_real(i,j,k) = 0.5*(W(i,j,k) + W(i,j,k+1))
+          
       enddo
     enddo
 enddo
+
