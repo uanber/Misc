@@ -97,9 +97,13 @@ real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qc ! 3D cloud water mixi
                                                            
 real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qv ! 3D water vapor mixing ratio. 
                                                            
-real, intent(INOUT), dimension(kms:kme) :: sl_avg, rt_avg, w_avg ! domain avg sl, rt, and w                                                           
+real, intent(INOUT), dimension(kms:kme) :: sl_avg, rt_avg, w_avg ! domain avg sl, rt, and w   ! can also be local                                                      
 
 real ::  no_point
+real ::  sl_sum, rt_sum, w_sum
+
+! local
+real, DIMENSION( ims:ime , jms:jme ) :: sl_2d, rt_2d, w_2d !
               
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
 ! calculating liquid water static energy sl_real and rt_real and w_real!             
