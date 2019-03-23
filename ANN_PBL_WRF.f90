@@ -2,7 +2,7 @@ MODULE ANN_PBL_WRF
 
 CONTAINS
 
-SUBROUTINE ANN_INPUTS(pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl_diagnostic_scale, &
+SUBROUTINE ANN_INPUTS (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl_diagnostic_scale, &
               state_mean, state_scale, sl_real_mean, rt_real_mean, sl_latent_to_real, &
               rt_latent_to_real, w_latent_to_real, rcld_latent_to_real, rrain_latent_to_real, &
               cld_latent_to_real, pbl_encoder_W, pbl_encoder_b, pbl_hidden_W, pbl_hidden_b, &
@@ -13,7 +13,7 @@ SUBROUTINE ANN_INPUTS(pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl_
               rt_domain_top, lh, shf, tsk, SWDNT, swdn_tod, PSFC, &
               cldmid, cldhigh, qr, &
               !
-              ims,ime,jms,jme,kms,kme
+              ims,ime,jms,jme,kms,kme)
               
               
               
@@ -77,7 +77,8 @@ real, intent(in), dimension(ims:ime,jms:jme) :: SWDNT ! downwelling SW at TOA
 real, intent(in), dimension(ims:ime,jms:jme) :: PSFC ! sfc pressure 
 
 
-real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qr ! 3D rain water mixing ratio 
+real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qr ! 3D rain water mixing ratio. 
+                                                           !For top of domain just specify some level at 3km
 
 
 
