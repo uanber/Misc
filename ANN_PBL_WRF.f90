@@ -1,6 +1,10 @@
 MODULE ANN_PBL_WRF
 
+implicit none
+
 CONTAINS
+
+public :: relu, relu_prime
 
 SUBROUTINE ANN_INPUTS (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl_diagnostic_scale, &
               state_mean, state_scale, sl_real_mean, rt_real_mean, sl_latent_to_real, &
@@ -70,11 +74,11 @@ real, intent(in), dimension(34) :: pbl_diag_decoder_b
 
 !integer, INTENT(IN) ::  npz
 real, intent(INOUT), dimension(ims:ime,kms:kme,jms:jme) :: sl_real, rt_real, w_real
-real, intent(in), dimension(ims:ime,kms:kme+1,jms:jme) ::  w ! vertical wind
+real, intent(in), dimension(ims:ime,kms:kme+1,jms:jme) ::  w ! model vertical wind (defined at model grid)
 real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: th_phy ! potential temperature perturbation
 !real, intent(INOUT), dimension(ims:ime,kms:kme,jms:jme) :: theta_T ! potential temperature 
 
-real, intent(in), dimension(ims:ime,jms:jme) :: hfx, lh ! sensible and latent heat flux
+real, intent(in), dimension(ims:ime,jms:jme) :: hfx, lh ! sensible and latent heat flux in w/m^2
 real, intent(in), dimension(ims:ime,jms:jme) :: tsk ! sfc temp.
 
 real, intent(in), dimension(ims:ime,jms:jme) :: SWDNT ! downwelling SW at TOA
@@ -105,4 +109,34 @@ do k=1, km
       enddo
     enddo
 enddo
+
+
+
+
+
+SUBROUTINE ANN_INPUTS
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! defining linear activation function and its derivative !
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+pure function relu(x) result(res)
+    !! Rectified Linear Unit (RELU) activation function.
+    real(rk), intent(in) :: x(:)
+    real(rk) :: res(size(x))
+    res = max(0., x)
+  end function relu
+
+  pure function relu_prime(x) result(res)
+    ! First derivative of the REctified Linear Unit (RELU) activation function.
+    real(rk), intent(in) :: x(:)
+    real(rk) :: res(size(x))
+    where (x > 0)
+      res = 1
+    elsewhere
+      res = 0
+    end where
+  end function relu_prime
+  
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
