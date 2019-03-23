@@ -235,5 +235,36 @@ pure function relu(x) result(res)
   end function latent
 
  
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!Function to concatenate arrays for ANN inputs  !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+function Concat_Arrays
+implicit none
+ 
+  ! Note: in Fortran 90 you must use the old array delimiters (/ , /)
+  real, dimension(:) :: a 
+  real, dimension(:) :: b 
+  real, dimension(:), allocatable :: c
+ 
+  allocate(c(size(a)+size(b)))
+  c(1 : size(a)) = a
+  c(size(a)+1 : size(a)+size(b)) = b
+  write(*,*) c
+ 
+  ! alternative
+  d = [a, b] ! (/a, b/)
+  write(*,*) d
+ 
+  deallocate(c)
+  deallocate(d)
+ 
+end function Concat_Arrays
+
+
+
+! flatten 2D array into 1D : new_array = pack(old_array,.true.)
+
 
 
