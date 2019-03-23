@@ -18,7 +18,9 @@ SUBROUTINE ANN_INPUTS (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl
               cldmid, cldhigh, qr, qc, qv, &
               ph, phb, & ! geopotential hieght and its perturbation 
               !theta_T
-              ims,ime,jms,jme,kms,kme, znu)
+              ids,ide,jds,jde,kds,kde, &
+              ims,ime,jms,jme,kms,kme, &
+              kts,kte,num_tiles, znu )
               
               
               
@@ -37,7 +39,9 @@ SUBROUTINE ANN_INPUTS (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl
               integer , parameter:: sl_rad_clr=9
               integer , parameter:: w=5
               
-              
+!
+USE module_dm, ONLY: wrf_dm_sum_real ! import the domain avg function
+!
 
 !integer, INTENT(IN) ::  npz
 !real, intent(in), dimension(is:ie,js:je,npz+1) :: phalf, zhalf
@@ -93,6 +97,7 @@ real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qc ! 3D cloud water mixi
 real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qv ! 3D water vapor mixing ratio. 
                                                            
 
+real ::  no_point
               
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
 ! calculating liquid water static energy sl_real and rt_real and w_real!             
@@ -109,6 +114,44 @@ do k=1, km
       enddo
     enddo
 enddo
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
+! calculating the averages !             
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+no_points = float((ide-ids)*(jde-jds))
+ 
+DO k=kts,kde-1
+      !DO k=kts,min(kte+1,kde)
+         sl_2d = 0.
+         rt_2d = 0.
+         w_2d = 0.
+         Dth_sum = 0.0
+         rho_sum=0.0
+         qv_sum = 0.0
+         Th_2d = 0.0
+         rho_2d = 0.0
+         DO ij = 1 , num_tiles;
+            DO j=j_start(ij),j_end(ij); DO i=i_start(ij),i_end(ij)
+               sl_2d(i,j) = sl_real(i,k,j)
+               dth_sum = dth_sum + th_2d(i,j)
+
+               rho_2d(i,j)=rho(i,k,j)
+               rho_sum = rho_sum + rho_2d(i,j)
+
+               qv_2d(i,j)=qv_curr(i,k,j)
+               qv_sum = qv_sum + qv_2d(i,j)
+
+            ENDDO; ENDDO
+         ENDDO
+  ENDDO
+         
+
+
+         !domain mean potential temperature:
+         th_avg(k) = wrf_dm_sum_real ( dth_sum )
+         th_avg(k) = th_avg(k) / no_points
+
 
 
 
