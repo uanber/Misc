@@ -18,6 +18,7 @@ SUBROUTINE ANN_INPUTS (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl
               cldmid, cldhigh, qr, qc, qv, &
               ph, phb, & ! geopotential hieght and its perturbation 
               !theta_T
+              sl_avg, rt_avg, w_avg, & ! domain mean profiles sl, rt, and w
               ids,ide,jds,jde,kds,kde, &
               ims,ime,jms,jme,kms,kme, &
               kts,kte,num_tiles, znu )
@@ -96,6 +97,7 @@ real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qc ! 3D cloud water mixi
                                                            
 real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qv ! 3D water vapor mixing ratio. 
                                                            
+real, intent(INOUT), dimension(kms:kme) :: sl_avg, rt_avg, w_avg ! domain avg sl, rt, and w                                                           
 
 real ::  no_point
               
@@ -116,41 +118,48 @@ do k=1, km
 enddo
 
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
-! calculating the averages !             
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-no_points = float((ide-ids)*(jde-jds))
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
+! calculating profile averages !             
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+no_points = float((ide-ids)*(jde-jds)) ! number of grid points
  
 DO k=kts,kde-1
       !DO k=kts,min(kte+1,kde)
          sl_2d = 0.
          rt_2d = 0.
          w_2d = 0.
-         Dth_sum = 0.0
-         rho_sum=0.0
-         qv_sum = 0.0
-         Th_2d = 0.0
-         rho_2d = 0.0
+         sl_sum = 0.0
+         rt_sum=0.0
+         w_sum = 0.0
+
          DO ij = 1 , num_tiles;
             DO j=j_start(ij),j_end(ij); DO i=i_start(ij),i_end(ij)
                sl_2d(i,j) = sl_real(i,k,j)
-               dth_sum = dth_sum + th_2d(i,j)
+               sl_sum = dth_sum + sl_2d(i,j)
 
-               rho_2d(i,j)=rho(i,k,j)
-               rho_sum = rho_sum + rho_2d(i,j)
+               rt_2d(i,j) = rt_real(i,k,j)
+               rt_sum = rt_sum + rt_2d(i,j)
 
-               qv_2d(i,j)=qv_curr(i,k,j)
-               qv_sum = qv_sum + qv_2d(i,j)
+               w_2d(i,j) = w_real(i,k,j)
+               w_sum = w_sum + w_2d(i,j)
 
             ENDDO; ENDDO
          ENDDO
   ENDDO
          
 
-
-         !domain mean potential temperature:
-         th_avg(k) = wrf_dm_sum_real ( dth_sum )
-         th_avg(k) = th_avg(k) / no_points
+         !domain mean sl:
+         sl_avg(k) = wrf_dm_sum_real ( sl_sum )
+         sl_avg(k) = sl_avg(k) / no_points
+         
+         !domain mean rt:
+         rt_avg(k) = wrf_dm_sum_real ( drt_sum )
+         rt_avg(k) = rt_avg(k) / no_points
+         
+         !domain mean w:
+         w_avg(k) = wrf_dm_sum_real ( w_sum )
+         w_avg(k) = w_avg(k) / no_points
 
 
 
