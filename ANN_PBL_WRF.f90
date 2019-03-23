@@ -10,8 +10,10 @@ SUBROUTINE ANN_INPUTS(pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl_
               !Real WRF variables
               
               sl_real, rt_real, sl_adv_real, rt_adv_real, w_real, sl_domain_top, &
-              rt_domain_top, lhf, shf, sst, swdn_toa, swdn_tod, p_surface, &
-              cldmid, cldhigh, rrain_domain_top)
+              rt_domain_top, lh, shf, tsk, SWDNT, swdn_tod, PSFC, &
+              cldmid, cldhigh, rrain_domain_top, &
+              !
+              ims,ime,jms,jme,kms,kme
               
               
               
@@ -34,6 +36,11 @@ SUBROUTINE ANN_INPUTS(pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl_
 
 !integer, INTENT(IN) ::  npz
 !real, intent(in), dimension(is:ie,js:je,npz+1) :: phalf, zhalf
+INTEGER, INTENT(IN) ::                                             &
+     &           ids,ide,jds,jde,kds,kde                              &
+     &          ,ims,ime,jms,jme,kms,kme                              &
+     &          ,kts,kte,num_tiles
+
 
 real, intent(in), dimension(33) :: pbl_input_mean, pbl_input_scale
 real, intent(in), dimension(34) :: pbl_diagnostic_mean, pbl_diagnostic_scale
@@ -59,8 +66,20 @@ real, intent(in), dimension(128,34) :: pbl_diag_decoder_W
 real, intent(in), dimension(34) :: pbl_diag_decoder_b
 
 
-integer, INTENT(IN) ::  npz
-real, intent(in), dimension(is:ie,js:je,npz+1) :: sl_real, rt_real
+!integer, INTENT(IN) ::  npz
+real, intent(in), dimension(is:ie,kms:kme,js:je) :: sl_real, rt_real
+real, intent(in), dimension(is:ie,kms:kme+1,js:je) ::  w_real ! +1 ?
+
+real, intent(in), dimension(is:ie,js:je) :: hfx, lh ! sensible and latent heat flux
+real, intent(in), dimension(is:ie,js:je) :: tsk ! sfc temp.
+
+real, intent(in), dimension(is:ie,js:je) :: SWDNT ! downwelling SW at TOA
+real, intent(in), dimension(is:ie,js:je) :: PSFC ! sfc pressure 
+
+
+
+
+
 
               
               
