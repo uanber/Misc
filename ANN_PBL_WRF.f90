@@ -4,7 +4,7 @@ implicit none
 
 CONTAINS
 
-public :: relu, relu_prime
+public :: relu, latent
 
 SUBROUTINE ANN_INPUTS (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl_diagnostic_scale, &
               state_mean, state_scale, sl_real_mean, rt_real_mean, sl_latent_to_real, &
@@ -21,7 +21,7 @@ SUBROUTINE ANN_INPUTS (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl
               sl_avg, rt_avg, w_avg, & ! domain mean profiles sl, rt, and w
               ids,ide,jds,jde,kds,kde, &
               ims,ime,jms,jme,kms,kme, &
-              kts,kte,num_tiles, znu )
+              kts,kte,num_tiles, znu, z )
               
               
               
@@ -42,7 +42,7 @@ SUBROUTINE ANN_INPUTS (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl
               
 !
 USE module_dm, ONLY: wrf_dm_sum_real ! import the domain avg function
-!
+USE module_init_utilities, ONLY : interp_0 ! import interpolation function
 
 !integer, INTENT(IN) ::  npz
 !real, intent(in), dimension(is:ie,js:je,npz+1) :: phalf, zhalf
@@ -52,6 +52,8 @@ INTEGER, INTENT(IN) ::                                             &
      &          ,kts,kte,num_tiles
 
 real, intent(in), dimension(kms:kme) :: znu ! hieght
+
+REAL, DIMENSION(ims:ime,kms:kme,jms:jme), INTENT(IN   ) :: z ! this is the height in x,y,z
 
 real, intent(in), dimension(33) :: pbl_input_mean, pbl_input_scale
 real, intent(in), dimension(34) :: pbl_diagnostic_mean, pbl_diagnostic_scale
@@ -100,10 +102,11 @@ real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qv ! 3D water vapor mixi
 real, intent(INOUT), dimension(kms:kme) :: sl_avg, rt_avg, w_avg ! domain avg sl, rt, and w   ! can also be local                                                      
 
 real ::  no_point
-real ::  sl_sum, rt_sum, w_sum
+real ::  sl_sum, rt_sum, w_sum, z_sum
 
 ! local
 real, DIMENSION( ims:ime , jms:jme ) :: sl_2d, rt_2d, w_2d !
+real, DIMENSION( kms:kme ) :: z_avg 
               
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
 ! calculating liquid water static energy sl_real and rt_real and w_real!             
@@ -113,7 +116,7 @@ do k=1, km
    do i=ims,ime
       do j=jms,jme
       
-          sl_real(i,k,j) = Cpd* th_phy(i,k,j)+300 - Lv * qc(i,k,j) + g * (PHB(i,k,j) + PH(i,k,j))/9.81 ! last term is g*z
+          sl_real(i,k,j) = Cpd* th_phy(i,k,j)+300 - Lv * qc(i,k,j) + g * (PHB(i,k,j) + PH(i,k,j))/9.81 !last term is g*z (could also use z)
           rt_real(i,k,j) = qv(i,k,j) + qc(i,kj)
           w_real(i,j,k) = 0.5*(W(i,j,k) + W(i,j,k+1))
           
@@ -136,6 +139,8 @@ DO k=kts,kde-1
          sl_sum = 0.0
          rt_sum=0.0
          w_sum = 0.0
+         
+         z_sum = 0.0
 
          DO ij = 1 , num_tiles;
             DO j=j_start(ij),j_end(ij); DO i=i_start(ij),i_end(ij)
@@ -147,6 +152,8 @@ DO k=kts,kde-1
 
                w_2d(i,j) = w_real(i,k,j)
                w_sum = w_sum + w_2d(i,j)
+               
+               z_sum = z_sum + z(i,k,j)
 
             ENDDO; ENDDO
          ENDDO
@@ -165,6 +172,33 @@ DO k=kts,kde-1
          w_avg(k) = wrf_dm_sum_real ( w_sum )
          w_avg(k) = w_avg(k) / no_points
 
+         !domain mean z (useful for interpolation)
+         z_avg(k) = wrf_dm_sum_real ( z_sum )
+         z_avg(k) = z_avg(k) / no_points
+         
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Interpolate the weights, biases, and inputs into the models grid  ! 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+
+do k=kts,kte
+   th_scm_target_modellevels(k) = interp_0(th_scm_target, z_force, zzz_avg(k), num_force_layers) 
+enddo
+
+
+
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! Transform variables from physical space to to latent space !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+sl_latent = matmul(sl_avg(:) - sl_real_mean(:) , transpose(sl_latent_to_real) )
+rt_latent = matmul(rt_avg(:) - sl_real_mean(:) , transpose(rt_latent_to_real) )
+w_latent = matmul(w_avg(:) - sl_real_mean(:) , transpose(w_latent_to_real) )
+
+
+
+
 
 
 
@@ -173,26 +207,33 @@ DO k=kts,kde-1
 SUBROUTINE ANN_INPUTS
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!! defining linear activation function and its derivative !
+!! defining linear activation function                    !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 pure function relu(x) result(res)
     !! Rectified Linear Unit (RELU) activation function.
-    real(rk), intent(in) :: x(:)
-    real(rk) :: res(size(x))
+    real , intent(in) :: x(:)
+    real :: res(size(x))
     res = max(0., x)
   end function relu
 
-  pure function relu_prime(x) result(res)
-    ! First derivative of the REctified Linear Unit (RELU) activation function.
-    real(rk), intent(in) :: x(:)
-    real(rk) :: res(size(x))
-    where (x > 0)
-      res = 1
-    elsewhere
-      res = 0
-    end where
-  end function relu_prime
   
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!Function to transform variables from physical space to to latent space !
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ 
+ pure function latent(x) result(res)
+    
+    real, intent(in) :: x(:)
+    real :: res(size(x))
+    res = max(0., x)
+    
+    !sl_latent = tf.tensordot(sl_real - sl_real_mean, tf.transpose(sl_latent_to_real), [0, 0])
+     x_latent = matmul(x , y)
+    
+  end function latent
+
+ 
+
 
