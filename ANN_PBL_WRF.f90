@@ -9,11 +9,12 @@ SUBROUTINE ANN_INPUTS (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl
               pbl_tend_decoder_W, pbl_tend_decoder_b, pbl_diag_decoder_W, pbl_diag_decoder_b, &
               !Real WRF variables
               
-              sl_real, rt_real, sl_adv_real, rt_adv_real, w_real, sl_domain_top, &
+              sl_real, th_phy, rt_real, sl_adv_real, rt_adv_real, w_real, sl_domain_top, &
               rt_domain_top, lh, shf, tsk, SWDNT, swdn_tod, PSFC, &
-              cldmid, cldhigh, qr, &
-              !
-              ims,ime,jms,jme,kms,kme)
+              cldmid, cldhigh, qr, qc, &
+              ph, phb, & ! geopotential hieght and its perturbation 
+              !theta_T
+              ims,ime,jms,jme,kms,kme, znu)
               
               
               
@@ -41,6 +42,7 @@ INTEGER, INTENT(IN) ::                                             &
      &          ,ims,ime,jms,jme,kms,kme                              &
      &          ,kts,kte,num_tiles
 
+real, intent(in), dimension(kms:kme) :: znu ! hieght
 
 real, intent(in), dimension(33) :: pbl_input_mean, pbl_input_scale
 real, intent(in), dimension(34) :: pbl_diagnostic_mean, pbl_diagnostic_scale
@@ -69,6 +71,8 @@ real, intent(in), dimension(34) :: pbl_diag_decoder_b
 !integer, INTENT(IN) ::  npz
 real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: sl_real, rt_real
 real, intent(in), dimension(ims:ime,kms:kme+1,jms:jme) ::  w_real ! +1 ?
+real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: th_phy ! potential temperature perturbation
+!real, intent(INOUT), dimension(ims:ime,kms:kme,jms:jme) :: theta_T ! potential temperature 
 
 real, intent(in), dimension(ims:ime,jms:jme) :: hfx, lh ! sensible and latent heat flux
 real, intent(in), dimension(ims:ime,jms:jme) :: tsk ! sfc temp.
@@ -80,9 +84,22 @@ real, intent(in), dimension(ims:ime,jms:jme) :: PSFC ! sfc pressure
 real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qr ! 3D rain water mixing ratio. 
                                                            !For top of domain just specify some level at 3km
 
+real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qc ! 3D cloud water mixing ratio. 
+                                                           !For top of domain just specify some level at 3km
 
 
+
               
-              
-              
-              
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!              
+! calculating liquid water static energy sl_real!              
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+do k=1, km
+   do i=ims,ime
+      do j=jms,jme
+      
+          sl_real(i,k,j) = Cpd* th_phy(i,k,j)+300 - Lv * qc(i,k,j) + g * (PHB(i,k,j) + PH(i,k,j))/9.81 ! last term is g*z
+         
+      enddo
+    enddo
+enddo
