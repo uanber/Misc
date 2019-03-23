@@ -11,7 +11,7 @@ SUBROUTINE ANN_INPUTS(pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl_
               
               sl_real, rt_real, sl_adv_real, rt_adv_real, w_real, sl_domain_top, &
               rt_domain_top, lh, shf, tsk, SWDNT, swdn_tod, PSFC, &
-              cldmid, cldhigh, rrain_domain_top, &
+              cldmid, cldhigh, qr, &
               !
               ims,ime,jms,jme,kms,kme
               
@@ -67,17 +67,17 @@ real, intent(in), dimension(34) :: pbl_diag_decoder_b
 
 
 !integer, INTENT(IN) ::  npz
-real, intent(in), dimension(is:ie,kms:kme,js:je) :: sl_real, rt_real
-real, intent(in), dimension(is:ie,kms:kme+1,js:je) ::  w_real ! +1 ?
+real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: sl_real, rt_real
+real, intent(in), dimension(ims:ime,kms:kme+1,jms:jme) ::  w_real ! +1 ?
 
-real, intent(in), dimension(is:ie,js:je) :: hfx, lh ! sensible and latent heat flux
-real, intent(in), dimension(is:ie,js:je) :: tsk ! sfc temp.
+real, intent(in), dimension(ims:ime,jms:jme) :: hfx, lh ! sensible and latent heat flux
+real, intent(in), dimension(ims:ime,jms:jme) :: tsk ! sfc temp.
 
-real, intent(in), dimension(is:ie,js:je) :: SWDNT ! downwelling SW at TOA
-real, intent(in), dimension(is:ie,js:je) :: PSFC ! sfc pressure 
+real, intent(in), dimension(ims:ime,jms:jme) :: SWDNT ! downwelling SW at TOA
+real, intent(in), dimension(ims:ime,jms:jme) :: PSFC ! sfc pressure 
 
 
-
+real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qr ! 3D rain water mixing ratio 
 
 
 
