@@ -266,5 +266,18 @@ end function Concat_Arrays
 
 ! flatten 2D array into 1D : new_array = pack(old_array,.true.)
 
+subroutine feedforward (a, z, w, b)
+
+real, intent(in), dimensions(:) :: w
+real, intent(in), dimensions(:) :: b
+real, intent(inout), dimensions(:) :: a, z
+
+
+do n = 1, 2 !size(layers)
+        z = matmul(a, transpose(w)) +  b
+        a = relu(z)
+end do
+      
+end subroutine feedforward
 
 
