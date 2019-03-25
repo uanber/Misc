@@ -220,19 +220,35 @@ pure function relu(x) result(res)
   
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!Function to transform variables from physical space to to latent space !
+!!Function to transform variables from physical space to latent space !!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  
- pure function latent(x) result(res)
+ pure function latent(x, x_c) result(x_latent)
     
     real, intent(in) :: x(:)
-    real :: res(size(x))
-    res = max(0., x)
+    real, intent(in) :: x_c(:)
+    
+    real, intent(out) :: x_latent(:)
     
     !sl_latent = tf.tensordot(sl_real - sl_real_mean, tf.transpose(sl_latent_to_real), [0, 0])
-     x_latent = matmul(x , y)
+     x_latent = matmul(x , x_c)
     
   end function latent
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!Function to transform variables from latent space to physical space !!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ 
+ pure function physical(x, x_c) result(x_physical)
+    
+    real, intent(in) :: x(:)
+    real, intent(in) :: x_c(:)
+    
+    real, intent(out) :: x_latent(:)
+    
+     x_physical = matmul(x_c , x)
+    
+  end function physical
 
  
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -266,18 +282,24 @@ end function Concat_Arrays
 
 ! flatten 2D array into 1D : new_array = pack(old_array,.true.)
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!! Forward Prop. Subroutine  !!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 subroutine feedforward (a, z, w, b)
 
-real, intent(in), dimensions(:) :: w
+real, intent(in), dimensions(:,:) :: w
 real, intent(in), dimensions(:) :: b
 real, intent(inout), dimensions(:) :: a, z
 
 
 do n = 1, 2 !size(layers)
-        z = matmul(a, transpose(w)) +  b
+        z = matmul(a, transpose(w(:,n))) +  b
         a = relu(z)
-end do
+enddo
       
 end subroutine feedforward
+
+
 
 
