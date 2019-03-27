@@ -273,15 +273,31 @@ rt_domain_top = rt_avg (d_top)
 
 rrain_domain_top = ar_avg(d_top)
 
+
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Concatenate variables in one input array  !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-input_array = [sl_avg, rt_avg, w_avg, sl_domain_top, rt_domain_top, & 
+pbl_input_raw = [sl_avg, rt_avg, w_avg, sl_domain_top, rt_domain_top, & 
                lh_avg, shf_avg, sst_avg, cldmid, cldhigh, &
                swdnt_avg, swdn_tod, psfc_avg, rrain_domain_top]
 
 
+
+
+
+pbl_input = (pbl_input_raw - pbl_input_mean) / pbl_input_scale
+
+! Forward prop.
+
+X = pbl_input
+X = matmul(X, pbl_encoder_W) + pbl_encoder_b
+X = relu(X) 
+X = matmul(X, pbl_hidden_W) + pbl_hidden_b
+X = relu(X)
+
+  
 
 
 
