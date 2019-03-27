@@ -19,7 +19,7 @@ SUBROUTINE ANN_INPUTS (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl
               ph, phb, & ! geopotential hieght and its perturbation 
               !theta_T
               sl_avg, rt_avg, w_avg, & ! domain mean profiles sl, rt, and w
-              sst_avg, shf_avg, lh_avg, wsdnt_avg, & ! domain mean 2d variables
+              sst_avg, shf_avg, lh_avg, wsdnt_avg, psfc_avg, & ! domain mean 2d variables
               ids,ide,jds,jde,kds,kde, &
               ims,ime,jms,jme,kms,kme, &
               kts,kte,num_tiles, znu, z )
@@ -101,10 +101,10 @@ real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qc ! 3D cloud water mixi
 real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qv ! 3D water vapor mixing ratio. 
                                                            
 real, intent(INOUT), dimension(kms:kme) :: sl_avg, rt_avg, w_avg ! domain avg sl, rt, and w   ! can also be local                                                      
-real, intent(INOUT)                     :: sst_avg, shf_avg, lh_avg, swdnt_avg ! domain mean
+real, intent(INOUT)                     :: sst_avg, shf_avg, lh_avg, swdnt_avg, psfc_avg ! domain mean
 
 real ::  no_point
-real ::  sl_sum, rt_sum, w_sum, z_sum, sst_sum, shf_sum, lh_sum, swdnt_sum
+real ::  sl_sum, rt_sum, w_sum, z_sum, sst_sum, shf_sum, lh_sum, swdnt_sum, psfc_sum
 
 ! local
 real, DIMENSION( ims:ime , jms:jme ) :: sl_2d, rt_2d, w_2d !
@@ -189,6 +189,7 @@ DO k=kts,kde-1
          shf_sum = 0.
          lh_sum = 0.
          swdnt_sum = 0.0
+         psfc_sum = 0.0
 
 
          DO ij = 1 , num_tiles;
@@ -202,7 +203,8 @@ DO k=kts,kde-1
                
                swdnt_sum = swdnt_sum + swdnt(i,j)
                
-
+               psfc_sum = psfc_sum + psfc(i,j)
+               
             ENDDO; ENDDO
          ENDDO
 
@@ -216,6 +218,8 @@ DO k=kts,kde-1
          lh_avg = lh_sum / no_points
 
          swdnt_avg = swdnt_sum / no_points
+         
+         psfc_avg = psfc_sum / no_points
 
 
 
