@@ -1,5 +1,6 @@
 MODULE module_ANN_PBL
 
+! UANBER 
 
 implicit none
 
@@ -13,12 +14,12 @@ SUBROUTINE ANN_PBL (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl_di
               cld_latent_to_real, pbl_encoder_W, pbl_encoder_b, pbl_hidden_W, pbl_hidden_b, &
               pbl_tend_decoder_W, pbl_tend_decoder_b, pbl_diag_decoder_W, pbl_diag_decoder_b, &
               !Real WRF variables
-              
+              &
               th_phy, sl_adv_real, rt_adv_real, & ! what's this?
               rt_domain_top, lh, shf, tsk, SWDNT, swdn_tod, PSFC, &
               CLDFRA, qr, qc, qv, &
               ph, phb, & ! geopotential hieght and its perturbation 
-              !theta_T
+              & !theta_T
               sl_avg, rt_avg, w_avg, qr_avg, cld_avg, & ! domain mean profiles sl, rt, w, and qr (rain water mixing ratio needed for qr(d_top)
               sst_avg, shf_avg, lh_avg, wsdnt_avg, psfc_avg, & ! domain mean 2d variables
               ids,ide,jds,jde,kds,kde, &
@@ -125,11 +126,13 @@ real, DIMENSION( kms:kme ) :: z_avg , ttend, qtend ! temperature and water tende
 ! local  
 real, dimension(ims:ime,kms:kme,jms:jme) :: sl_real, rt_real, w_real
 real :: cldlow, cldmid, cldhigh, rrain_domain_top, swdn_tod, sl_domain_top, rt_domain_top, rrain_domain_top
-              
+
+! dimension cannot have a deferred shape! specify the shape from the dimensions defined above 
+
 real, dimension(:) ::  pbl_input, X, tend_pbl, diag, sl_pbl_tend_latent, rt_pbl_tend_latent, sl_rad_tend_latent, &
                        rcld_latent, rrain_latent, cld_latent 
 
-! OUTPUTs
+! OUTPUTS
 real, intent(OUT), dimention (:) :: sl_pbl_tend_real, rt_pbl_tend_real, sl_rad_tend_real
 
 real, dimension( ims:ime, kms:kme, jms:jme ), intent(inout)   ::  rthblten,  rqcblten   
@@ -325,17 +328,17 @@ tend_pbl = tend_pbl * state_scale
 diag = matmul(X, pbl_diag_decoder_W) + pbl_diag_decoder_b ! not needed
 diag = diag * pbl_diagnostic_scale !! not needed
 
-sl_rad_tend_latent = diag[size(diag)-n_sl : size(diag)]   
+sl_rad_tend_latent = diag(size(diag)-n_sl : size(diag))   
 diag = diag + pbl_diagnostic_mean
 
  
-sl_pbl_tend_latent = tend_pbl[1:n_sl] ! indexing in Fortrans starts with 1 not 0
+sl_pbl_tend_latent = tend_pbl(1:n_sl) ! indexing in Fortrans starts with 1 not 0
 
-rt_pbl_tend = tend_pbl[n_sl+1 : size(tend_pbl)] 
+rt_pbl_tend = tend_pbl(n_sl+1 : size(tend_pbl))
 
-rcld_latent   =  tend_pbl[1: n_rcld]
-rrain_latent  =  tend_pbl[n_rcld+1 : n_rcld+n_rrain+1]
-cld_latent    =  tend_pbl[n_rcld+n_rrain+1 :n_rcld+n_rrain+n_cld+1 ]
+rcld_latent   =  tend_pbl(1: n_rcld)
+rrain_latent  =  tend_pbl(n_rcld+1 : n_rcld+n_rrain+1)
+cld_latent    =  tend_pbl(n_rcld+n_rrain+1 :n_rcld+n_rrain+n_cld+1 )
 !cldlow =  tend_pbl[n_start+1 :n_start+1+1 ]
 !precip =  tend_pbl[n_start+1+1 :n_start+2+1 ]
 !csw    =  tend_pbl[n_start+2+1 :n_start+3+1 ]
@@ -366,8 +369,8 @@ DO k=kts,kde-1
   qtnp(k) = 0.
 ENDDO 
 
-ttnp[1:size(sl_pbl_tend_real)] = sl_avg[1:size(sl_pbl_tend_real)] + sl_pbl_tend_real + sl_rad_tend_real ! advection will be perform in the dynamical core 
-qtnp[1:size(rt_pbl_tend_real)] = rt_avg[1:size(rt_pbl_tend_real)] + rt_pbl_tend_real 
+ttnp(1:size(sl_pbl_tend_real)) = sl_avg(1:size(sl_pbl_tend_real)) + sl_pbl_tend_real + sl_rad_tend_real ! advection will be perform in the dynamical core 
+qtnp(1:size(rt_pbl_tend_real)) = rt_avg(1:size(rt_pbl_tend_real)) + rt_pbl_tend_real 
 
 
 
