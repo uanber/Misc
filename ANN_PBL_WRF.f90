@@ -13,16 +13,17 @@ SUBROUTINE ANN_INPUTS (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl
               pbl_tend_decoder_W, pbl_tend_decoder_b, pbl_diag_decoder_W, pbl_diag_decoder_b, &
               !Real WRF variables
               
-              sl_real, th_phy, rt_real, sl_adv_real, rt_adv_real, w_real, sl_domain_top, &
+              th_phy, sl_adv_real, rt_adv_real, & ! what's this?
               rt_domain_top, lh, shf, tsk, SWDNT, swdn_tod, PSFC, &
-              cldmid, cldhigh, qr, qc, qv, &
+              CLDFRA, qr, qc, qv, &
               ph, phb, & ! geopotential hieght and its perturbation 
               !theta_T
-              sl_avg, rt_avg, w_avg, & ! domain mean profiles sl, rt, and w
+              sl_avg, rt_avg, w_avg, qr_avg, cld_avg, & ! domain mean profiles sl, rt, w, and qr (rain water mixing ratio needed for qr(d_top)
               sst_avg, shf_avg, lh_avg, wsdnt_avg, psfc_avg, & ! domain mean 2d variables
               ids,ide,jds,jde,kds,kde, &
               ims,ime,jms,jme,kms,kme, &
-              kts,kte,num_tiles, znu, z )
+              kts,kte,num_tiles, znu, z, &
+              d_top, d_low, d_mid, d_high )
               
               
               
@@ -51,6 +52,13 @@ INTEGER, INTENT(IN) ::                                             &
      &           ids,ide,jds,jde,kds,kde                              &
      &          ,ims,ime,jms,jme,kms,kme                              &
      &          ,kts,kte,num_tiles
+
+!!!!!!!
+INTEGER, INTENT(IN) ::  d_top ! top of the BPL say 3 km to be specified in the namelist
+INTEGER, INTENT(IN) ::  d_low, d_mid, d_high ! index of low, mid, and high clouds to be specified in the namelist
+
+!!!!!!!
+
 
 real, intent(in), dimension(kms:kme) :: znu ! hieght
 
@@ -81,7 +89,7 @@ real, intent(in), dimension(34) :: pbl_diag_decoder_b
 
 
 !integer, INTENT(IN) ::  npz
-real, intent(INOUT), dimension(ims:ime,kms:kme,jms:jme) :: sl_real, rt_real, w_real
+!
 real, intent(in), dimension(ims:ime,kms:kme+1,jms:jme) ::  w ! model vertical wind (defined at model grid)
 real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: th_phy ! potential temperature perturbation
 !real, intent(INOUT), dimension(ims:ime,kms:kme,jms:jme) :: theta_T ! potential temperature 
@@ -99,16 +107,23 @@ real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qr ! 3D rain water mixin
 real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qc ! 3D cloud water mixing ratio. 
                                                            
 real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: qv ! 3D water vapor mixing ratio. 
+
+real, intent(in), dimension(ims:ime,kms:kme,jms:jme) :: cldfra ! cloud fraction
+
                                                            
-real, intent(INOUT), dimension(kms:kme) :: sl_avg, rt_avg, w_avg ! domain avg sl, rt, and w   ! can also be local                                                      
+real, intent(INOUT), dimension(kms:kme) :: sl_avg, rt_avg, w_avg, qr_avg, cld_avg, ! domain avg sl, rt, and w and qr ! can also be local                                                      
 real, intent(INOUT)                     :: sst_avg, shf_avg, lh_avg, swdnt_avg, psfc_avg ! domain mean
 
 real ::  no_point
-real ::  sl_sum, rt_sum, w_sum, z_sum, sst_sum, shf_sum, lh_sum, swdnt_sum, psfc_sum
+real ::  sl_sum, rt_sum, w_sum, qr_sum, cld_sum, z_sum, sst_sum, shf_sum, lh_sum, swdnt_sum, psfc_sum
 
 ! local
-real, DIMENSION( ims:ime , jms:jme ) :: sl_2d, rt_2d, w_2d !
+real, DIMENSION( ims:ime , jms:jme ) :: sl_2d, rt_2d, w_2d , qr_2d, cld_2d
 real, DIMENSION( kms:kme ) :: z_avg 
+
+! local  
+real, dimension(ims:ime,kms:kme,jms:jme) :: sl_real, rt_real, w_real
+real :: cldlow, cldmid, cldhigh, rrain_domain_top, swdn_tod, sl_domain_top, rt_domain_top, rrain_domain_top
               
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
 ! calculating liquid water static energy sl_real and rt_real and w_real!             
@@ -119,8 +134,8 @@ do k=1, km
       do j=jms,jme
       
           sl_real(i,k,j) = Cpd* th_phy(i,k,j)+300 - Lv * qc(i,k,j) + g * (PHB(i,k,j) + PH(i,k,j))/9.81 !last term is g*z (could also use z)
-          rt_real(i,k,j) = qv(i,k,j) + qc(i,kj)
-          w_real(i,j,k) = 0.5*(W(i,j,k) + W(i,j,k+1))
+          rt_real(i,k,j) = qv(i,k,j) + qc(i,k,j)
+          w_real(i,k,j) = 0.5*(W(i,k,j) + W(i,k+1,j))
           
       enddo
     enddo
@@ -138,14 +153,20 @@ DO k=kts,kde-1
          sl_2d = 0.
          rt_2d = 0.
          w_2d = 0.
+         qr_2d =0.
+         cld_2d = 0.
+         
          sl_sum = 0.0
          rt_sum=0.0
          w_sum = 0.0
+         qr_sum = 0.0
+         cld_sum = 0.0
          
          z_sum = 0.0
 
          DO ij = 1 , num_tiles;
             DO j=j_start(ij),j_end(ij); DO i=i_start(ij),i_end(ij)
+            
                sl_2d(i,j) = sl_real(i,k,j)
                sl_sum = sl_sum + sl_2d(i,j)
 
@@ -155,11 +176,16 @@ DO k=kts,kde-1
                w_2d(i,j) = w_real(i,k,j)
                w_sum = w_sum + w_2d(i,j)
                
+               qr_2d(i,j) = qr(i,k,j)
+               qr_sum = qr_sum + qr_2d(i,j)
+               
+               cld_2d(i,j) = cldfra(i,k,j)
+               cld_sum = cld_sum + cld_2d(i,j)
+               
                z_sum = z_sum + z(i,k,j)
 
             ENDDO; ENDDO
          ENDDO
-  ENDDO
          
 
          !domain mean sl:
@@ -173,61 +199,95 @@ DO k=kts,kde-1
          !domain mean w:
          w_avg(k) = wrf_dm_sum_real ( w_sum )
          w_avg(k) = w_avg(k) / no_points
+         
+         !domain mean qr:
+         qr_avg(k) = wrf_dm_sum_real ( qr_sum )
+         qr_avg(k) = qr_avg(k) / no_points
+         
+         !domain mean cldfra:
+         cld_avg(k) = wrf_dm_sum_real ( cld_sum )
+         cld_avg(k) = cld_avg(k) / no_points
 
          !domain mean z (useful for interpolation)
          z_avg(k) = wrf_dm_sum_real ( z_sum )
          z_avg(k) = z_avg(k) / no_points
          
-
-
+ENDDO
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
 ! calculating 2D variables averages !             
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-         sst_sum = 0.
-         shf_sum = 0.
-         lh_sum = 0.
-         swdnt_sum = 0.0
-         psfc_sum = 0.0
+sst_sum = 0.
+shf_sum = 0.
+lh_sum = 0.
+swdnt_sum = 0.0
+psfc_sum = 0.0
 
 
-         DO ij = 1 , num_tiles;
-            DO j=j_start(ij),j_end(ij); DO i=i_start(ij),i_end(ij)
+DO ij = 1 , num_tiles;
+   DO j=j_start(ij),j_end(ij); DO i=i_start(ij),i_end(ij)
    
-               sst_sum = sst_sum + tsk(i,j)
+      sst_sum = sst_sum + tsk(i,j)
                
-               shf_sum = shf_sum + shf(i,j)
+      shf_sum = shf_sum + shf(i,j)
 
-               lh_sum = lh_sum + lh(i,j)
+      lh_sum = lh_sum + lh(i,j)
                
-               swdnt_sum = swdnt_sum + swdnt(i,j)
+      swdnt_sum = swdnt_sum + swdnt(i,j)
                
-               psfc_sum = psfc_sum + psfc(i,j)
+      psfc_sum = psfc_sum + psfc(i,j)
                
-            ENDDO; ENDDO
-         ENDDO
+      ENDDO; ENDDO
+ENDDO
 
 
-         !domain mean :
+!domain mean :
        
-         sst_avg = sst_sum / no_points
+sst_avg = sst_sum / no_points
 
-         shf_avg = shf_sum / no_points
+shf_avg = shf_sum / no_points
          
-         lh_avg = lh_sum / no_points
+lh_avg = lh_sum / no_points
 
-         swdnt_avg = swdnt_sum / no_points
-         
-         psfc_avg = psfc_sum / no_points
+swdnt_avg = swdnt_sum / no_points
 
-
+psfc_avg = psfc_sum / no_points
 
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! variables at low, mid, high, and domain top levels !
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! Interpolate the weights, biases, and inputs into the models grid  ! 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+cldlow = cld_avg(d_low)
+cldmid = cld_avg(d_mid)
+cldhigh = cld_avg(d_high)
+
+swdn_tod = swdnt(d_top)
+
+rrain_domain_top = qr_avg(d_top)
+
+sl_domain_top = sl_avg(d_top)
+
+rt_domain_top = rt_avg (d_top)
+
+rrain_domain_top = ar_avg(d_top)
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Concatenate variables in one input array  !
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+input_array = [sl_avg, rt_avg, w_avg, sl_domain_top, rt_domain_top, & 
+               lh_avg, shf_avg, sst_avg, cldmid, cldhigh, &
+               swdnt_avg, swdn_tod, psfc_avg, rrain_domain_top]
+
+
+
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! Interpolate the weights, biases, and inputs into the models grid !! 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
 
 do k=kts,kte
    th_scm_target_modellevels(k) = interp_0(th_scm_target, z_force, zzz_avg(k), num_force_layers) 
