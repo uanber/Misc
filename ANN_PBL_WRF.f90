@@ -1,4 +1,5 @@
-MODULE ANN_PBL_WRF
+MODULE module_ANN_PBL
+
 
 implicit none
 
@@ -6,7 +7,7 @@ CONTAINS
 
 public :: relu, latent
 
-SUBROUTINE ANN_INPUTS (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl_diagnostic_scale, &
+SUBROUTINE ANN_PBL (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl_diagnostic_scale, &
               state_mean, state_scale, sl_real_mean, rt_real_mean, sl_latent_to_real, &
               rt_latent_to_real, w_latent_to_real, rcld_latent_to_real, rrain_latent_to_real, &
               cld_latent_to_real, pbl_encoder_W, pbl_encoder_b, pbl_hidden_W, pbl_hidden_b, &
@@ -26,25 +27,25 @@ SUBROUTINE ANN_INPUTS (pbl_input_mean, pbl_input_scale, pbl_diagnostic_mean, pbl
               d_top, d_low, d_mid, d_high )
               
               
-              
+ ! Constants             
               real, parameter:: g= 9.81
               real, parameter:: Cpd= 1005.
               real, parameter:: Rd= 287.
               real, parameter:: Lv= 2.5e6
               
-              integer , parameter:: cld=10
-              integer , parameter:: rcld=10
-              integer , parameter:: rrain=2
-              integer , parameter:: rt=8
-              integer , parameter:: rt_adv=8
-              integer , parameter:: sl=9
-              integer , parameter:: sl_adv=9
-              integer , parameter:: sl_rad_clr=9
-              integer , parameter:: w=5
+! dimensions              
+              integer , parameter:: n_rcld=10
+              integer , parameter:: n_cld=10
+              integer , parameter:: n_rrain=2
+              integer , parameter:: n_sl=9
+              integer , parameter:: n_rt=8
+              integer , parameter:: n_w=9 
+
               
 !
 USE module_dm, ONLY: wrf_dm_sum_real ! import the domain avg function
 USE module_init_utilities, ONLY : interp_0 ! import interpolation function
+
 
 !integer, INTENT(IN) ::  npz
 !real, intent(in), dimension(is:ie,js:je,npz+1) :: phalf, zhalf
@@ -119,17 +120,25 @@ real ::  sl_sum, rt_sum, w_sum, qr_sum, cld_sum, z_sum, sst_sum, shf_sum, lh_sum
 
 ! local
 real, DIMENSION( ims:ime , jms:jme ) :: sl_2d, rt_2d, w_2d , qr_2d, cld_2d
-real, DIMENSION( kms:kme ) :: z_avg 
+real, DIMENSION( kms:kme ) :: z_avg , ttend, qtend ! temperature and water tendency
 
 ! local  
 real, dimension(ims:ime,kms:kme,jms:jme) :: sl_real, rt_real, w_real
 real :: cldlow, cldmid, cldhigh, rrain_domain_top, swdn_tod, sl_domain_top, rt_domain_top, rrain_domain_top
               
-real, dimension(:) ::  pbl_input, X
+real, dimension(:) ::  pbl_input, X, tend_pbl, diag, sl_pbl_tend_latent, rt_pbl_tend_latent, sl_rad_tend_latent, &
+                       rcld_latent, rrain_latent, cld_latent 
+
+! OUTPUTs
+real, intent(OUT), dimention (:) :: sl_pbl_tend_real, rt_pbl_tend_real, sl_rad_tend_real
+
+real, dimension( ims:ime, kms:kme, jms:jme ), intent(inout)   ::  rthblten,  rqcblten   
+
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
 ! calculating liquid water static energy sl_real and rt_real and w_real!             
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Better to use potential temperature instead of sl
 
 do k=1, km
    do i=ims,ime
@@ -281,14 +290,14 @@ rrain_domain_top = ar_avg(d_top)
 !! Transform variables from physical space to to latent space !!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-sl_latent = matmul(sl_avg(:) - sl_real_mean(:) , transpose(sl_latent_to_real) )
+sl_latent = matmul(sl_avg(:) - sl_real_mean(:) , transpose(sl_latent_to_real) ) ! note sl_avg and sl_real_mean are NOT the same size 
 rt_latent = matmul(rt_avg(:) - sl_real_mean(:) , transpose(rt_latent_to_real) )
 w_latent = matmul(w_avg(:) - sl_real_mean(:) , transpose(w_latent_to_real) )
 
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! Concatenate variables in one input array  !
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Concatenate variables into one input array  !
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 pbl_input_raw = [sl_latent, rt_latent, w_latent, sl_domain_top, rt_domain_top, & 
                lh_avg, shf_avg, sst_avg, cldmid, cldhigh, &
@@ -308,26 +317,85 @@ X = relu(matmul(X, pbl_encoder_W) + pbl_encoder_b)
 
 X = relu(matmul(X, pbl_hidden_W) + pbl_hidden_b)
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  
+tend_pbl = matmul(X, pbl_tend_decoder_W) + pbl_tend_decoder_b
+tend_pbl = tend_pbl * state_scale
+
+diag = matmul(X, pbl_diag_decoder_W) + pbl_diag_decoder_b ! not needed
+diag = diag * pbl_diagnostic_scale !! not needed
+
+sl_rad_tend_latent = diag[size(diag)-n_sl : size(diag)]   
+diag = diag + pbl_diagnostic_mean
+
+ 
+sl_pbl_tend_latent = tend_pbl[1:n_sl] ! indexing in Fortrans starts with 1 not 0
+
+rt_pbl_tend = tend_pbl[n_sl+1 : size(tend_pbl)] 
+
+rcld_latent   =  tend_pbl[1: n_rcld]
+rrain_latent  =  tend_pbl[n_rcld+1 : n_rcld+n_rrain+1]
+cld_latent    =  tend_pbl[n_rcld+n_rrain+1 :n_rcld+n_rrain+n_cld+1 ]
+!cldlow =  tend_pbl[n_start+1 :n_start+1+1 ]
+!precip =  tend_pbl[n_start+1+1 :n_start+2+1 ]
+!csw    =  tend_pbl[n_start+2+1 :n_start+3+1 ]
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! Transform variables from latent space back to physical space !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+sl_pbl_tend_real = matmul(sl_pbl_tend_latent, sl_latent_to_real)
+rt_pbl_tend_real = matmul(rt_pbl_tend_latent, rt_latent_to_real)
+sl_rad_tend_real = matmul(sl_rad_tend_latent, sl_latent_to_real)
+
+! not needed
+rcld_real = matmul(rcld_latent, rcld_latent_to_real)
+rrain_real = matmul(rrain_latent, rrain_latent_to_real)
+cld_real = matmul(cld_latent, cld_latent_to_real)
+!
+
+!sl_w_adv_real = - w_avg * matmul(sl_avg, ddz)  ! not needed
+!rt_w_adv_real = - w_avg * matmul(rt_avg, ddz)  ! not needed
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! now update the tendencies !
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+DO k=kts,kde-1
+  ttnp(k) = 0.
+  qtnp(k) = 0.
+ENDDO 
+
+ttnp[1:size(sl_pbl_tend_real)] = sl_avg[1:size(sl_pbl_tend_real)] + sl_pbl_tend_real + sl_rad_tend_real ! advection will be perform in the dynamical core 
+qtnp[1:size(rt_pbl_tend_real)] = rt_avg[1:size(rt_pbl_tend_real)] + rt_pbl_tend_real 
 
 
 
+DO k=kts,kde-1
+    DO ij = 1 , num_tiles;
+        DO j=j_start(ij),j_end(ij);   DO i=i_start(ij),i_end(ij)
+        
+            RQVBLTEN(i,k,j) = RQVBLTEN(i,k,j) - qtend(k)
+            RTHBLTEN(i,k,j) = RTHBLTEN(i,k,j) - ttend(k)
+
+      enddo
+    enddo; enddo
+enddo
+
+
+    
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !! Interpolate the weights, biases, and inputs into the models grid !! 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
 
-do k=kts,kte
-   th_scm_target_modellevels(k) = interp_0(th_scm_target, z_force, zzz_avg(k), num_force_layers) 
-enddo
+!do k=kts,kte
+!   th_scm_target_modellevels(k) = interp_0(th_scm_target, z_force, zzz_avg(k), num_force_layers) 
+!enddo
 
 
 
 
-
-
-
-SUBROUTINE ANN_INPUTS
+SUBROUTINE ANN_PBL
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !! defining linear activation function                    !
@@ -345,7 +413,7 @@ pure function relu(x) result(res)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!Function to transform variables from physical space to latent space !!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! Not Needed
+! Not used
  pure function latent(x, x_c) result(x_latent)
     
     real, intent(in) :: x(:)
@@ -363,7 +431,7 @@ pure function relu(x) result(res)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!Function to concatenate arrays for ANN inputs  !!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! NOT NEEDED
+! NOT USED
 
 function Concat_Arrays
 implicit none
