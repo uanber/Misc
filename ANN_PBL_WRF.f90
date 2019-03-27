@@ -125,6 +125,8 @@ real, DIMENSION( kms:kme ) :: z_avg
 real, dimension(ims:ime,kms:kme,jms:jme) :: sl_real, rt_real, w_real
 real :: cldlow, cldmid, cldhigh, rrain_domain_top, swdn_tod, sl_domain_top, rt_domain_top, rrain_domain_top
               
+real, dimension(:) ::  pbl_input, X
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
 ! calculating liquid water static energy sl_real and rt_real and w_real!             
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -275,27 +277,37 @@ rrain_domain_top = ar_avg(d_top)
 
 
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! Transform variables from physical space to to latent space !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+sl_latent = matmul(sl_avg(:) - sl_real_mean(:) , transpose(sl_latent_to_real) )
+rt_latent = matmul(rt_avg(:) - sl_real_mean(:) , transpose(rt_latent_to_real) )
+w_latent = matmul(w_avg(:) - sl_real_mean(:) , transpose(w_latent_to_real) )
+
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Concatenate variables in one input array  !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-pbl_input_raw = [sl_avg, rt_avg, w_avg, sl_domain_top, rt_domain_top, & 
+pbl_input_raw = [sl_latent, rt_latent, w_latent, sl_domain_top, rt_domain_top, & 
                lh_avg, shf_avg, sst_avg, cldmid, cldhigh, &
                swdnt_avg, swdn_tod, psfc_avg, rrain_domain_top]
 
 
 
-
+! Perform normalization
 
 pbl_input = (pbl_input_raw - pbl_input_mean) / pbl_input_scale
 
-! Forward prop.
+! Forward propagation: The following is: ReL (W2 * ReL(W3 * x_in + b3) + b2)
 
 X = pbl_input
-X = matmul(X, pbl_encoder_W) + pbl_encoder_b
-X = relu(X) 
-X = matmul(X, pbl_hidden_W) + pbl_hidden_b
-X = relu(X)
+
+X = relu(matmul(X, pbl_encoder_W) + pbl_encoder_b)
+
+X = relu(matmul(X, pbl_hidden_W) + pbl_hidden_b)
+
 
   
 
@@ -308,20 +320,6 @@ X = relu(X)
 do k=kts,kte
    th_scm_target_modellevels(k) = interp_0(th_scm_target, z_force, zzz_avg(k), num_force_layers) 
 enddo
-
-
-
-
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!! Transform variables from physical space to to latent space !!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-sl_latent = matmul(sl_avg(:) - sl_real_mean(:) , transpose(sl_latent_to_real) )
-rt_latent = matmul(rt_avg(:) - sl_real_mean(:) , transpose(rt_latent_to_real) )
-w_latent = matmul(w_avg(:) - sl_real_mean(:) , transpose(w_latent_to_real) )
-
-
 
 
 
@@ -347,7 +345,7 @@ pure function relu(x) result(res)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!Function to transform variables from physical space to latent space !!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
- 
+! Not Needed
  pure function latent(x, x_c) result(x_latent)
     
     real, intent(in) :: x(:)
@@ -360,31 +358,16 @@ pure function relu(x) result(res)
     
   end function latent
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!Function to transform variables from latent space to physical space !!!!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
- 
- pure function physical(x, x_c) result(x_physical)
-    
-    real, intent(in) :: x(:)
-    real, intent(in) :: x_c(:)
-    
-    real, intent(out) :: x_latent(:)
-    
-     x_physical = matmul(x_c , x)
-    
-  end function physical
 
  
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!Function to concatenate arrays for ANN inputs  !!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+! NOT NEEDED
 
 function Concat_Arrays
 implicit none
  
-  ! Note: in Fortran 90 you must use the old array delimiters (/ , /)
   real, dimension(:) :: a 
   real, dimension(:) :: b 
   real, dimension(:), allocatable :: c
@@ -395,7 +378,7 @@ implicit none
   write(*,*) c
  
   ! alternative
-  d = [a, b] ! (/a, b/)
+  d = [a, b]
   write(*,*) d
  
   deallocate(c)
@@ -403,27 +386,6 @@ implicit none
  
 end function Concat_Arrays
 
-
-
-! flatten 2D array into 1D : new_array = pack(old_array,.true.)
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!! Forward Prop. Subroutine  !!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-subroutine feedforward (a, z, w, b)
-
-real, intent(in), dimensions(:,:) :: w
-real, intent(in), dimensions(:) :: b
-real, intent(inout), dimensions(:) :: a, z
-
-
-do n = 1, 2 !size(layers)
-        z = matmul(a, transpose(w(:,n))) +  b
-        a = relu(z)
-enddo
-      
-end subroutine feedforward
 
 
 
