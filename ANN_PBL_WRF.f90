@@ -317,16 +317,16 @@ pbl_input = (pbl_input_raw - pbl_input_mean) / pbl_input_scale
 
 X = pbl_input
 
-X = relu(matmul(X, pbl_encoder_W) + pbl_encoder_b)
+X = relu(matmul(pbl_encoder_W, X) + pbl_encoder_b)
 
-X = relu(matmul(X, pbl_hidden_W) + pbl_hidden_b)
+X = relu(matmul(pbl_hidden_W, X) + pbl_hidden_b)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-tend_pbl = matmul(X, pbl_tend_decoder_W) + pbl_tend_decoder_b
+tend_pbl = matmul(pbl_tend_decoder_W, X) + pbl_tend_decoder_b
 tend_pbl = tend_pbl * state_scale
 
-diag = matmul(X, pbl_diag_decoder_W) + pbl_diag_decoder_b ! not needed
+diag = matmul(pbl_diag_decoder_W, X) + pbl_diag_decoder_b ! not needed
 diag = diag * pbl_diagnostic_scale !! not needed
 
 sl_rad_tend_latent = diag(size(diag)-n_sl : size(diag))   
